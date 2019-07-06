@@ -1,0 +1,13 @@
+At night time Amy's friends come, and umulo comes too - and they have an awesome car they made at christmas - the car has 3 car bits: 1 for 3 people to sit in, one on the back on the left which is the alicorn room, and the third is for the animals, and there's a box for umulo, it also has a rainbow on the car bit.
+
+It was the best day, but the worst night, because the Dark Dragons were out at night and stealing all of the child's dreams.
+
+But when Amy saw them, she sort of recognised them, and she said: "Bluey One? Bluey One?" because she actually found an egg, and one of the Dark Dragons came out of it and she'd lost it. and she'd named it Bluey One, and then changed the name later to blacky one.
+
+And then Amy jumped onto the Dark Dragon and they went to stop the other dragons.
+
+But there were really strong winds, and it pushed them towards the other dragons, and they crahsed onto the ground and they didn't take any more dreams because they were dead - but Bluey One was the only one still alive.
+
+And after that they went back home but there was still a problem: All their Christmas and Halloween costumes had gone!
+
+But it was all just a dream because Amy was having a dream during her daytime nap! But Bluey One was still there.
