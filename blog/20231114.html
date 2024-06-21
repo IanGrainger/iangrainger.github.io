@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Vite with Umbraco for modern bundling and dev server</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-11-14T00:00:00+00:00" itemprop="datePublished">Nov 14, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>Umbraco has a script and asset bundling and minification solution built in, called <a href="https://docs.umbraco.com/umbraco-cms/reference/configuration/runtimeminificationsettings">Smidge</a>. But we have always needed more preprocessing.</p>
+  
+  <p>We used to use Grunt or Gulp to do this processing, as well as sprite generation and image optimisation. But these tools are rather old now, and there are better options now in the form of bundlers such as <a href="https://webpack.js.org/">Webpack</a> and <a href="https://vitejs.dev/">Vite</a>.</p>
+  
+  <p>People have already <a href="https://skrift.io/issues/vite-and-umbraco-for-faster-frontend-builds/">integrated Vite with Umbraco</a> due to its speed - and because it gives a modern development experience with hot module reloading. So we decided to try it for our next project.</p>
+  
+  <h2 id="viteaspnetcore">Vite.AspNetCore</h2>
+  
+  <p>The <a href="https://github.com/Eptagone/Vite.AspNetCore">Vite.AspNetCore</a> nuget package provides middleware to help integrate Vite with an ASP.NET Core server (such as that used by Umbraco).</p>
+  
+  <p>There’s more work to do than just installing the nuget package, however - so after installing it, I made the following changes to my project - based on the <a href="https://github.com/Eptagone/Vite.AspNetCore/tree/main/examples/ViteNET.MVC">example ViteNET.MVC</a>:</p>
+  
+  <ul>
+    <li>Copied <code class="language-plaintext highlighter-rouge">package.json</code>, <code class="language-plaintext highlighter-rouge">vite.config.js</code> and <code class="language-plaintext highlighter-rouge">tsconfig.json</code> to the root of the project</li>
+    <li>Updated <code class="language-plaintext highlighter-rouge">appsettings.json</code> / <code class="language-plaintext highlighter-rouge">appsettings.Development.json</code> with the <code class="language-plaintext highlighter-rouge">"Vite"</code> section</li>
+    <li>Added the two lines to the <code class="language-plaintext highlighter-rouge">Startup.cs</code> file (<code class="language-plaintext highlighter-rouge">services.AddViteServices();</code> and <code class="language-plaintext highlighter-rouge">app.UseViteDevMiddleware();</code>)</li>
+    <li>Added the two sections from the <code class="language-plaintext highlighter-rouge">.csproj</code> file (after the comments <code class="language-plaintext highlighter-rouge">Ensure Node environment on Build</code> and <code class="language-plaintext highlighter-rouge">Build the final assets</code>)</li>
+    <li>Added <code class="language-plaintext highlighter-rouge">@addTagHelper *, Vite.AspNetCore</code> to <code class="language-plaintext highlighter-rouge">_ViewImports.cshtml</code></li>
+    <li>Modified our <code class="language-plaintext highlighter-rouge">_Layout.cshtml</code> file to include the styles and scripts from the <code class="language-plaintext highlighter-rouge">main.ts</code> entrypoint</li>
+  </ul>
+  
+  <p>Once all those changes were made, the Vite dev server was running when debugging with F5 - and building the resources for deployment in the build process.</p>
+  
+  <h2 id="output-paths">Output paths</h2>
+  
+  <p>However, testing the Vite build locally was a little difficult because there were already site resources for our Umbraco site. in the output <code class="language-plaintext highlighter-rouge">wwwroot</code> folder - and running the build would output would leave files that we couldn’t easily clean up.</p>
+  
+  <p>It would be much better if we could give Vite its own output folder, so that it was free to clean it, and we could add it to <code class="language-plaintext highlighter-rouge">.gitignore</code>.</p>
+  
+  <p>To do this, I made the following changes:</p>
+  
+  <ul>
+    <li>Modified the <code class="language-plaintext highlighter-rouge">vite.config.js</code> file to add: <code class="language-plaintext highlighter-rouge">build: { outDir: '../wwwroot/vite' }</code></li>
+    <li>Added <code class="language-plaintext highlighter-rouge">"Vite": { "base": "/vite" }</code> in <code class="language-plaintext highlighter-rouge">appsettings.json</code></li>
+    <li>Added <code class="language-plaintext highlighter-rouge">/vite/</code> prefix to the path to <code class="language-plaintext highlighter-rouge">main.ts</code> in <code class="language-plaintext highlighter-rouge">_Layout.cshtml</code> and any other assset paths</li>
+    <li>Added <code class="language-plaintext highlighter-rouge">/wwwroot/vite/</code> to <code class="language-plaintext highlighter-rouge">.gitignore</code></li>
+  </ul>
+  
+  <h2 id="spritemaps">Spritemaps</h2>
+  
+  <p>The next feature we needed was to combine svg icons into a spritemap. For this we used <a href="https://www.npmjs.com/package/@spiriit/vite-plugin-svg-spritemap">vite-plugin-svg-spritemap</a>. <code class="language-plaintext highlighter-rouge">npm i --save-dev @spiriit/vite-plugin-svg-spritemap</code>.</p>
+  
+  <p>The plugin uses a special <code class="language-plaintext highlighter-rouge">__spritemap</code> route in development, but <a href="https://github.com/SpiriitLabs/vite-plugin-svg-spritemap/issues/14">didn’t update the manifest file correctly</a>, so I couldn’t use it to change the path to the output file when running in production. But then the developer released a new version THAT DAY that fixed the issue!</p>
+  
+  <p>So now that I could get the path to use in production, I could add this to the razor view:</p>
+  
+  <pre><code class="language-cshtml">&lt;environment include="Development"&gt;
+    &lt;use href="__spritemap#sprite-icon-name"&gt;&lt;/use&gt;
+  &lt;/environment&gt;
+  &lt;environment include="Production"&gt;
+    &lt;use href="$"{Manifest["sprite.svg"]}#sprite-icon-name"&gt;&lt;/use&gt;
+  &lt;/environment&gt;
+  </code></pre>
+  
+  <p>But this is rather big and ugly, so I created a razor helper function to simplify it to:</p>
+  
+  <pre><code class="language-cshtml">  &lt;use href="@viteFns.SpriteHref("icon-name")"&gt;&lt;/use&gt;
+  </code></pre>
+  
+  <p>To do this, I created a class that derived from <code class="language-plaintext highlighter-rouge">RazorPage&lt;dynamic&gt;</code> and used the IViteManifest service to get the path to the spritemap file for production:</p>
+  
+  <div class="language-cs highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">class</span> <span class="nc">ViteFunctions</span> <span class="p">:</span> <span class="n">RazorPage</span><span class="p">&lt;</span><span class="kt">dynamic</span><span class="p">&gt;</span>
+  <span class="p">{</span>
+      <span class="k">public</span> <span class="k">readonly</span> <span class="n">IViteManifest</span> <span class="n">Manifest</span><span class="p">;</span>
+      <span class="k">public</span> <span class="nf">ViteFunctions</span><span class="p">(</span><span class="n">IViteManifest</span> <span class="n">Manifest</span><span class="p">)</span> <span class="p">{</span> <span class="k">this</span><span class="p">.</span><span class="n">Manifest</span> <span class="p">=</span> <span class="n">Manifest</span><span class="p">;</span> <span class="p">}</span>
+      <span class="k">public</span> <span class="k">override</span> <span class="n">Task</span> <span class="nf">ExecuteAsync</span><span class="p">()</span> <span class="p">{</span> <span class="k">throw</span> <span class="k">new</span> <span class="nf">NotImplementedException</span><span class="p">();</span> <span class="p">}</span>
+  
+      <span class="k">public</span> <span class="kt">string</span> <span class="nf">SpriteHref</span><span class="p">(</span><span class="kt">string</span> <span class="n">spriteName</span><span class="p">)</span>
+      <span class="p">{</span>
+          <span class="k">if</span> <span class="p">(</span><span class="n">Environment</span><span class="p">.</span><span class="nf">GetEnvironmentVariable</span><span class="p">(</span><span class="s">"ASPNETCORE_ENVIRONMENT"</span><span class="p">)</span> <span class="p">==</span> <span class="n">Environments</span><span class="p">.</span><span class="n">Development</span><span class="p">)</span>
+          <span class="p">{</span>
+              <span class="k">return</span> <span class="s">$"__spritemap#sprite-</span><span class="p">{</span><span class="n">spriteName</span><span class="p">}</span><span class="s">"</span><span class="p">;</span>
+          <span class="p">}</span>
+          <span class="k">else</span>
+          <span class="p">{</span>
+              <span class="c1">// assume production</span>
+              <span class="k">return</span> <span class="s">$"</span><span class="p">{</span><span class="n">Manifest</span><span class="p">[</span><span class="s">"vite/spritemap.svg"</span><span class="p">]?.</span><span class="n">File</span><span class="p">}</span><span class="s">#sprite-</span><span class="p">{</span><span class="n">spriteName</span><span class="p">}</span><span class="s">"</span><span class="p">;</span>
+          <span class="p">}</span>
+      <span class="p">}</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <p>I then needed to:</p>
+  
+  <ul>
+    <li>Register the class in <code class="language-plaintext highlighter-rouge">Startup.cs</code>: <code class="language-plaintext highlighter-rouge">services.AddSingleton&lt;ViteFunctions&gt;();</code></li>
+    <li>Add <code class="language-plaintext highlighter-rouge">@inject TPI.Website.ViteFunctions viteFns</code> to <code class="language-plaintext highlighter-rouge">_ViewImports.cshtml</code></li>
+  </ul>
+  
+  <h2 id="calling-js-functions-inside-razor-views">Calling JS functions inside razor views</h2>
+  
+  <p>The bundle created by Vite has a single entrypoint, and any unused exports are removed as part of minification. This means there wasn’t an easy way to call a function with parameters serialised using Razor from inside the view code.</p>
+  
+  <p>To leave exports from the entrypoint file, I needed to set: <code class="language-plaintext highlighter-rouge">config: { build: { preserveEntrySignatures: 'allow-extension' } }</code> in <code class="language-plaintext highlighter-rouge">vite.config.ts</code>.</p>
+  
+  <p>Then I could add <code class="language-plaintext highlighter-rouge">import {exportedFn} from './vite/main.ts';</code> into a <code class="language-plaintext highlighter-rouge">&lt;script type="module"&gt;</code> element in the view. But this won’t work in production, because the <code class="language-plaintext highlighter-rouge">main.ts</code> entrypoint will end up being the processed/minified/hashed JS file. So I added another helper function to ViteFunctions to get the correct path based on the environment:</p>
+  
+  <div class="language-cs highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="kt">string</span> <span class="nf">PathToJS</span><span class="p">(</span><span class="kt">string</span> <span class="n">path</span><span class="p">)</span>
+  <span class="p">{</span>
+      <span class="k">if</span> <span class="p">(</span><span class="n">Environment</span><span class="p">.</span><span class="nf">GetEnvironmentVariable</span><span class="p">(</span><span class="s">"ASPNETCORE_ENVIRONMENT"</span><span class="p">)</span> <span class="p">==</span> <span class="n">Environments</span><span class="p">.</span><span class="n">Development</span><span class="p">)</span>
+      <span class="p">{</span>
+          <span class="k">return</span> <span class="s">$"/</span><span class="p">{</span><span class="n">path</span><span class="p">}</span><span class="s">"</span><span class="p">;</span>
+      <span class="p">}</span>
+      <span class="k">else</span>
+      <span class="p">{</span>
+          <span class="c1">// assume production</span>
+          <span class="k">return</span> <span class="s">$"/</span><span class="p">{</span><span class="n">Manifest</span><span class="p">[</span><span class="s">"tpi/"</span> <span class="p">+</span> <span class="n">path</span><span class="p">]?.</span><span class="n">File</span><span class="p">}</span><span class="s">"</span><span class="p">;</span>
+      <span class="p">}</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <p>Then the script in the page can look like:</p>
+  
+  <pre><code class="language-cshtml">&lt;script type="module"&gt;
+    import { exportedFn } from "@viteFns.PathToJS("main.ts")";
+    exportedFn(@Json.Serialize(Model));
+  &lt;/script&gt;
+  </code></pre>
+  
+  <h2 id="conclusion">Conclusion</h2>
+  
+  <p>Now we can use a fast, modern bundler and dev server for our front-end assets in our Umbraco sites, with all the features we need.</p>
+  </article>
+        </div>
+      </main>
+</body>
+</html>

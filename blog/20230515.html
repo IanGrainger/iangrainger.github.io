@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Script Kit is amazing</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-05-15T00:00:00+00:00" itemprop="datePublished">May 15, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>I’d been meaning to try out <a href="https://www.scriptkit.com/">Script Kit</a> after I’d seen it mentioned by the likes of Kent C. Dodds AND Matt Pocock on Twitter.</p>
+  
+  <p>I had been looking at Android and WearOS to allow me to quickly start and stop my <a href="https://productive.io/">productive.io</a> timers without having to use the web interface (which is fine, but far from optimal!). But Java development 🤢. Then I realised this is exactly the kind of thing Script Kit is for! Only on my desktop PC still, not on my watch or phone, alas.</p>
+  
+  <h2 id="my-script-kit-scripts">My Script Kit scripts</h2>
+  
+  <p>Script Kit can make web requests using fetch, has a nice <code class="language-plaintext highlighter-rouge">env</code> API, can let you choose from lists and show desktop notifications.</p>
+  
+  <h3 id="env-settings">Env settings</h3>
+  
+  <p>Need an environment variable? Just call the <code class="language-plaintext highlighter-rouge">env</code> function with the name of the key and a prompt for the user to enter it if it isn’t there: <code class="language-plaintext highlighter-rouge">const API_KEY = env('API_KEY', 'Please enter your Productive API key')</code>.</p>
+  
+  <p>TBH it would have been nice to give some more help text here: I’d written down how to find this value - but I can’t see a way to add that extra text. The API is beautifully simple though.</p>
+  
+  <h3 id="shortcuts">Shortcuts</h3>
+  
+  <p>Because Script Kit monitors your scripts for changes, you can add an OS-wide shortcut key by just adding a comment to the top of your script like:</p>
+  
+  <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>// Shortcut: ctrl+alt+shift+,
+  </code></pre></div></div>
+  
+  <h3 id="notifications">Notifications</h3>
+  
+  <p>I couldn’t find mention of notifications in the docs, but I asked on Twitter and was <a href="https://twitter.com/scriptkitapp/status/1658456135417102336?s=20">told it existed</a>:</p>
+  
+  <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>notify({title: 'Timer started'}, { body: `Timer started for ${project.name}`})
+  </code></pre></div></div>
+  
+  <h3 id="productive-openapi">Productive OpenAPI</h3>
+  
+  <p>One issue I ran into was that <a href="https://productive.io/">productive.io</a> don’t have a javascript client or even an OpenAPI spec document to allow me to build my own! So I had to muddle through writing fetches manually 😅 with no type safety.</p>
+  
+  <h2 id="productivity">Productivity++</h2>
+  
+  <p>So far the most useful scripts have been to stop the current timer and start the last active one with a keyboard shortcut - so useful when I want to go for a walk and lunch, and when I get back! 🚶</p>
+  
+  <p>The next thing I’d like to be able to do is restart a timer on any recent project - and stop the current one if there is one. The problem is that you only want to restart the timer if its the same day - so I need to do a bit of work to create new time entries based on the selected project if it was last run yesterday or before.</p>
+  
+  <p>I’ve put my scripts in an open <a href="https://github.com/IanIsFluent?tab=repositories">GitHub repo here</a>.</p>
+  </article>
+        </div>
+      </main>
+</body>
+</html>

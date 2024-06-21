@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Getting unpublished Umbraco content in Controllers (Umbraco 11+)</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-12-08T00:00:00+00:00" itemprop="datePublished">Dec 8, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>When working with <a href="https://umbraco.com/">Umbraco</a>, we sometimes need to get content that may not be ‘published’. To do this in a controller, we need to use the Umbraco <code class="language-plaintext highlighter-rouge">ContentService</code>. But the methods here aren’t as straightforward as you might expect. To get all content with a certain document type, you can use <code class="language-plaintext highlighter-rouge">GetPagedOfType</code> - but sometimes we just want them all, and this function’s parameters aren’t the easiest to use!</p>
+  
+  <h2 id="1-getting-the-document-type-id">1. Getting the document type ID</h2>
+  
+  <p><code class="language-plaintext highlighter-rouge">GetPagedOfType</code> takes an integer ID for the document type, but we usually want to use the document type alias. To get the ID, we can use:</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">var</span> <span class="n">contentTypeId</span> <span class="p">=</span> <span class="n">ContentTypeService</span><span class="p">.</span><span class="nf">Get</span><span class="p">(</span><span class="s">"DocTypeAlias"</span><span class="p">)?.</span><span class="n">Id</span><span class="p">;</span>
+  </code></pre></div></div>
+  
+  <h2 id="2-getting-the-number-of-items">2. Getting the number of items</h2>
+  
+  <p>Now we can get the content, if we set the page size to be <code class="language-plaintext highlighter-rouge">int.MaxValue</code> we should be able to get everything in most cases.</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">ContentService</span><span class="p">.</span><span class="nf">GetPagedOfType</span><span class="p">(</span><span class="n">contentTypeId</span><span class="p">,</span> <span class="m">0</span><span class="p">,</span> <span class="kt">int</span><span class="p">.</span><span class="n">MaxValue</span><span class="p">,</span> <span class="k">out</span> <span class="n">_</span><span class="p">,</span> <span class="k">null</span><span class="p">);</span>
+  </code></pre></div></div>
+  
+  <h2 id="3-what-is-an-iquery">3. What is an IQuery<icontent>?</icontent></h2>
+  
+  <p>The reason I wanted to write this post is that I didn’t know how to use the query paramter and couldn’t find out from the docs. I did find a forum post explaining and wanted to record it here for future reference. It turns out the IQuery it refers to is the SQL query that Umbraco will run behind the scenes when getting the content - so we’ll need to inject the SQL Scope.</p>
+  
+  <p>Here is an example of how you’d request all forms of document type with id <code class="language-plaintext highlighter-rouge">contentTypeId</code> that are ‘draft’ (not published or trashed):</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">var</span> <span class="n">contentTypeId</span> <span class="p">=</span> <span class="n">ContentTypeService</span><span class="p">.</span><span class="nf">Get</span><span class="p">(</span><span class="s">"DocTypeAlias"</span><span class="p">)?.</span><span class="n">Id</span><span class="p">;</span>
+  
+  <span class="k">using</span> <span class="nn">var</span> <span class="n">scope</span> <span class="p">=</span> <span class="n">ScopeProvider</span><span class="p">.</span><span class="nf">CreateScope</span><span class="p">(</span><span class="n">autoComplete</span><span class="p">:</span> <span class="k">true</span><span class="p">);</span>
+  <span class="kt">var</span> <span class="n">query</span> <span class="p">=</span> <span class="n">scope</span><span class="p">.</span><span class="n">SqlContext</span><span class="p">.</span><span class="n">Query</span><span class="p">&lt;</span><span class="n">IContent</span><span class="p">&gt;().</span><span class="nf">Where</span><span class="p">(</span><span class="n">c</span> <span class="p">=&gt;</span> <span class="p">!</span><span class="n">c</span><span class="p">.</span><span class="n">Published</span> <span class="p">&amp;&amp;</span> <span class="p">!</span><span class="n">c</span><span class="p">.</span><span class="n">Trashed</span><span class="p">);</span>
+  
+  <span class="kt">var</span> <span class="n">unpublishedContentItems</span> <span class="p">=</span> <span class="n">ContentService</span><span class="p">.</span><span class="nf">GetPagedOfType</span><span class="p">(</span><span class="n">contentTypeId</span><span class="p">,</span> <span class="m">0</span><span class="p">,</span> <span class="kt">int</span><span class="p">.</span><span class="n">MaxValue</span><span class="p">,</span> <span class="k">out</span> <span class="n">_</span><span class="p">,</span> <span class="n">query</span><span class="p">);</span>
+  </code></pre></div></div>
+  
+  <p>Remember to inject <code class="language-plaintext highlighter-rouge">IContentService</code>, <code class="language-plaintext highlighter-rouge">IContentTypeService</code> and <code class="language-plaintext highlighter-rouge">IScopeProvider</code> into your controller constructor.</p>
+  
+  <h2 id="conclusion">Conclusion</h2>
+  
+  <p>Now we can get all unpublished content in our controller code, and we know how to use the <code class="language-plaintext highlighter-rouge">IQuery&lt;IContent&gt;</code> parameter of <code class="language-plaintext highlighter-rouge">GetPagedOfType</code> to filter the results.</p>
+  </article>
+        </div>
+      </main>
+</body>
+</html>

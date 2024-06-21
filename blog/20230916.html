@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Easier and cleaner git workflow</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-09-16T00:00:00+00:00" itemprop="datePublished">Sep 16, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>I have recently fallen in love with <code class="language-plaintext highlighter-rouge">git rebase</code> ❤️. It’s a great way to keep your git history clean and tidy by making it look like work was done in a simple linear fashion, even if it wasn’t. Now if I have work locally, I want to always rebase it onto the latest changes from the remote branch, rather than merge. I wondered if I could make this happen automatically when I pull in VSCode?</p>
+  
+  <h2 id="auto-rebase">Auto rebase</h2>
+  
+  <p><a href="https://stackoverflow.com/a/38911284">StackOverflow to the rescue!</a> (As usual!).</p>
+  
+  <p>You can <a href="https://git-scm.com/docs/git-config#Documentation/git-config.txt-pullrebase">set git config to rebase whenever pulling</a> using <code class="language-plaintext highlighter-rouge">git config pull.rebase true</code>.</p>
+  
+  <h2 id="auto-stash">Auto stash</h2>
+  
+  <p>But then you can’t pull without first committing your changes. This is a pain if you don’t want to or can’t keep your working directory clean.</p>
+  
+  <p>To deal with this you can <a href="https://git-scm.com/docs/git-config#Documentation/git-config.txt-rebaseautoStash">set another git config setting to stash whenever rebasing</a> <code class="language-plaintext highlighter-rouge">git config rebase.autoStash true</code>. This will stash your changes before pulling, and then reapply them after the pull is complete.</p>
+  
+  <h2 id="set-per-repo">Set per repo</h2>
+  
+  <p>Now I can pull and rebase easily without having to commit my changes, and my git history is clean and simple by setting these two config options on each repo:</p>
+  
+  <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git config pull.rebase true
+  git config rebase.autoStash true
+  </code></pre></div></div>
+  
+  <p>Yay! 🙌</p>
+  </article>
+        </div>
+      </main>
+</body>
+</html>

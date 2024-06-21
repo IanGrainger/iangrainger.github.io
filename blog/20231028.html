@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Azure DevOps Web App Deployment and Umbraco</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-10-28T00:00:00+00:00" itemprop="datePublished">Oct 28, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>When using the AzureRmWebAppDeployment@4 task in yaml pipelines, the default is to run from a zip file, which sets <code class="language-plaintext highlighter-rouge">WEBSITE_RUN_FROM_PACKAGE=1</code>. This is fine for most cases, but <a href="https://docs.umbraco.com/umbraco-cms/fundamentals/setup/server-setup/azure-web-apps#issues-with-read-only-filesystems">Umbraco sites don’t work on a read only filesystem</a>.</p>
+  
+  <h2 id="the-secret-setting">The secret setting</h2>
+  
+  <p>The pipelines <a href="https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-rm-web-app-deployment-v4?view=azure-pipelines">Azure Web App Deployment Task</a> input value <code class="language-plaintext highlighter-rouge">enableCustomDeployment: true</code> will stop pipelines from auto-detecting the best deployment method and use ‘webDeploy’.</p>
+  
+  <p>This will unzip the files into App Service storage, and leave <code class="language-plaintext highlighter-rouge">WEBSITE_RUN_FROM_PACKAGE</code> unset, giving Umbraco write access to the filesystem, and allowing it to run.</p>
+  </article>
+        </div>
+      </main>
+</body>
+</html>
