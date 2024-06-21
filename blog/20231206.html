@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Adding data to an Umbraco index (Umbraco 11+)</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-12-06T00:00:00+00:00" itemprop="datePublished">Dec 6, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p><a href="https://umbraco.com/">Umbraco</a> uses the Lucene search index - with a wrapper called <a href="https://shazwazza.github.io/Examine/">Examine</a>. If you want to customize the search index, you can attach an event handler to an event that fires when the index is updated and change/add to the data that is being stored.</p>
+  
+  <h2 id="adding-the-application-started-event-handler">Adding the application started event handler</h2>
+  
+  <p>Unfortunately, there’s no Umbraco notification handler for when the index is updated. But there is an event that fires when the application starts, and we can use that to attach our event handler to the index update event.</p>
+  
+  <p>This is done by calling <code class="language-plaintext highlighter-rouge">AddEventHandler</code> to the <code class="language-plaintext highlighter-rouge">IServiceCollection</code> object in <code class="language-plaintext highlighter-rouge">Startup</code>:</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">void</span> <span class="nf">ConfigureServices</span><span class="p">(</span><span class="n">IServiceCollection</span> <span class="n">services</span><span class="p">)</span>
+  <span class="p">{</span>
+    <span class="n">services</span>
+      <span class="p">.</span><span class="nf">AddUmbraco</span><span class="p">(</span><span class="n">_env</span><span class="p">,</span> <span class="n">_config</span><span class="p">)</span>
+      <span class="p">.</span><span class="nf">AddBackOffice</span><span class="p">()</span>
+      <span class="p">.</span><span class="nf">AddWebsite</span><span class="p">()</span>
+      <span class="p">.</span><span class="n">AddNotificationHandler</span><span class="p">&lt;</span><span class="n">UmbracoApplicationStartingNotification</span><span class="p">,</span> <span class="n">ExtraIndexDataHandler</span><span class="p">&gt;()</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <h2 id="creating-the-event-handler">Creating the event handler</h2>
+  
+  <p>The event handler needs to implement <code class="language-plaintext highlighter-rouge">INotificationHandler&lt;UmbracoApplicationStartingNotification&gt;</code> and will get the index we want to use (Umbraco has <code class="language-plaintext highlighter-rouge">ExternalIndex</code>, <code class="language-plaintext highlighter-rouge">InternalIndex</code> and <code class="language-plaintext highlighter-rouge">MemberIndex</code> built in) then add the event handler to the <code class="language-plaintext highlighter-rouge">TransformingIndexValues</code> event:</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">class</span> <span class="nc">ExtraIndexDataHandler</span> <span class="p">:</span> <span class="n">INotificationHandler</span><span class="p">&lt;</span><span class="n">UmbracoApplicationStartingNotification</span><span class="p">&gt;</span>
+  <span class="p">{</span>
+      <span class="k">private</span> <span class="k">readonly</span> <span class="n">IExamineManager</span> <span class="n">_examineManager</span><span class="p">;</span>
+      <span class="k">private</span> <span class="k">readonly</span> <span class="n">IExtraIndexDataHandler</span> <span class="n">_handler</span><span class="p">;</span>
+  
+      <span class="k">public</span> <span class="nf">ExtraIndexDataHandler</span><span class="p">(</span>
+          <span class="n">IExamineManager</span> <span class="n">examineManager</span><span class="p">,</span>
+          <span class="n">IExtraIndexDataHandler</span> <span class="n">handler</span><span class="p">)</span>
+      <span class="p">{</span>
+          <span class="n">_examineManager</span> <span class="p">=</span> <span class="n">examineManager</span><span class="p">;</span>
+          <span class="n">_handler</span> <span class="p">=</span> <span class="n">handler</span><span class="p">;</span>
+      <span class="p">}</span>
+  
+      <span class="k">public</span> <span class="k">void</span> <span class="nf">Handle</span><span class="p">(</span><span class="n">UmbracoApplicationStartingNotification</span> <span class="n">notification</span><span class="p">)</span>
+      <span class="p">{</span>
+          <span class="k">if</span> <span class="p">(</span><span class="n">_examineManager</span><span class="p">.</span><span class="nf">TryGetIndex</span><span class="p">(</span><span class="s">"ExternalIndex"</span><span class="p">,</span> <span class="k">out</span> <span class="kt">var</span> <span class="n">index</span><span class="p">))</span>
+          <span class="p">{</span>
+              <span class="p">((</span><span class="n">BaseIndexProvider</span><span class="p">)</span><span class="n">index</span><span class="p">).</span><span class="n">TransformingIndexValues</span> <span class="p">+=</span> <span class="n">_handler</span><span class="p">.</span><span class="n">Handle</span><span class="p">;</span>
+          <span class="p">}</span>
+      <span class="p">}</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <h2 id="creating-the-index-data-handler">Creating the index data handler</h2>
+  
+  <p>Now we can do the work of adding the data to the index in our <code class="language-plaintext highlighter-rouge">IExtraIndexDataHandler</code> implementation. We need to wrap the code in a <code class="language-plaintext highlighter-rouge">try</code>/<code class="language-plaintext highlighter-rouge">catch</code> block otherwise an error when indexing one document can affect the rest of the index.</p>
+  
+  <p>This handler will add the value of the <code class="language-plaintext highlighter-rouge">Interesting</code> property to the index for any document type with the alias <code class="language-plaintext highlighter-rouge">InterestingDocType</code>:</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">class</span> <span class="nc">ExtraIndexDataHandler</span> <span class="p">:</span> <span class="n">IExtraIndexDataHandler</span>
+  <span class="p">{</span>
+      <span class="k">private</span> <span class="k">readonly</span> <span class="n">IContentService</span> <span class="n">_contentService</span><span class="p">;</span>
+      <span class="k">private</span> <span class="k">readonly</span> <span class="n">ILogger</span><span class="p">&lt;</span><span class="n">ExtraIndexDataHandler</span><span class="p">&gt;</span> <span class="n">_logger</span><span class="p">;</span>
+  
+      <span class="k">public</span> <span class="nf">ExtraIndexDataHandler</span><span class="p">(</span>
+          <span class="n">IContentService</span> <span class="n">contentService</span><span class="p">,</span>
+          <span class="n">ILogger</span><span class="p">&lt;</span><span class="n">ExtraIndexDataHandler</span><span class="p">&gt;</span> <span class="n">logger</span><span class="p">)</span>
+      <span class="p">{</span>
+          <span class="n">_contentService</span> <span class="p">=</span> <span class="n">contentService</span><span class="p">;</span>
+          <span class="n">_logger</span> <span class="p">=</span> <span class="n">logger</span><span class="p">;</span>
+      <span class="p">}</span>
+  
+      <span class="k">public</span> <span class="k">void</span> <span class="nf">Handle</span><span class="p">(</span><span class="kt">object</span><span class="p">?</span> <span class="n">sender</span><span class="p">,</span> <span class="n">IndexingItemEventArgs</span> <span class="n">e</span><span class="p">)</span>
+      <span class="p">{</span>
+          <span class="k">try</span>
+          <span class="p">{</span>
+              <span class="nf">HandleUnsafely</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+          <span class="p">}</span>
+          <span class="k">catch</span> <span class="p">(</span><span class="n">Exception</span> <span class="n">ex</span><span class="p">)</span>
+          <span class="p">{</span>
+              <span class="n">_logger</span><span class="p">.</span><span class="nf">LogError</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="s">"Error attempting to add extra data to index while processing nodeId {nodeId}"</span><span class="p">,</span> <span class="n">e</span><span class="p">.</span><span class="n">ValueSet</span><span class="p">.</span><span class="n">Id</span><span class="p">);</span>
+          <span class="p">}</span>
+      <span class="p">}</span>
+  
+      <span class="k">private</span> <span class="k">void</span> <span class="nf">HandleUnsafely</span><span class="p">(</span><span class="n">IndexingItemEventArgs</span> <span class="n">e</span><span class="p">)</span>
+      <span class="p">{</span>
+          <span class="k">if</span> <span class="p">(!</span><span class="n">e</span><span class="p">.</span><span class="n">ValueSet</span><span class="p">.</span><span class="n">ItemType</span><span class="p">.</span><span class="nf">InvariantEquals</span><span class="p">(</span><span class="s">"InterestingDocType"</span><span class="p">)</span>
+              <span class="p">||</span> <span class="p">!</span><span class="kt">int</span><span class="p">.</span><span class="nf">TryParse</span><span class="p">(</span><span class="n">e</span><span class="p">.</span><span class="n">ValueSet</span><span class="p">.</span><span class="n">Id</span><span class="p">,</span> <span class="k">out</span> <span class="kt">var</span> <span class="n">nodeId</span><span class="p">))</span>
+          <span class="p">{</span>
+              <span class="k">return</span><span class="p">;</span>
+          <span class="p">}</span>
+  
+          <span class="kt">var</span> <span class="n">node</span> <span class="p">=</span> <span class="n">_contentService</span><span class="p">.</span><span class="nf">GetById</span><span class="p">(</span><span class="n">nodeId</span><span class="p">);</span>
+  
+          <span class="k">if</span> <span class="p">(</span><span class="n">node</span> <span class="p">==</span> <span class="k">null</span><span class="p">)</span>
+          <span class="p">{</span>
+              <span class="k">return</span><span class="p">;</span>
+          <span class="p">}</span>
+  
+          <span class="kt">var</span> <span class="n">values</span> <span class="p">=</span> <span class="n">e</span><span class="p">.</span><span class="n">ValueSet</span><span class="p">.</span><span class="n">Values</span>
+              <span class="p">.</span><span class="nf">ToDictionary</span><span class="p">(</span><span class="n">x</span> <span class="p">=&gt;</span> <span class="n">x</span><span class="p">.</span><span class="n">Key</span><span class="p">,</span> <span class="n">x</span> <span class="p">=&gt;</span> <span class="p">(</span><span class="n">IEnumerable</span><span class="p">&lt;</span><span class="kt">object</span><span class="p">&gt;)</span><span class="n">x</span><span class="p">.</span><span class="n">Value</span><span class="p">);</span>
+  
+          <span class="kt">var</span> <span class="n">interestingPropertyValue</span> <span class="p">=</span> <span class="n">node</span><span class="p">.</span><span class="nf">GetValue</span><span class="p">(</span><span class="s">"Interesting"</span><span class="p">)?.</span><span class="nf">GetValue</span><span class="p">();</span>
+          <span class="n">values</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="s">"Interesting"</span><span class="p">,</span> <span class="k">new</span> <span class="p">[]</span> <span class="p">{</span> <span class="n">interestingPropertyValue</span> <span class="p">});</span>
+          <span class="n">e</span><span class="p">.</span><span class="nf">SetValues</span><span class="p">(</span><span class="n">values</span><span class="p">);</span>
+      <span class="p">}</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <h2 id="adding-implementation-to-di">Adding implementation to DI</h2>
+  
+  <p>Of course we will also need to register the <code class="language-plaintext highlighter-rouge">IExtraIndexDataHandler</code> implementation in DI. This is done in <code class="language-plaintext highlighter-rouge">Startup</code> - also in the <code class="language-plaintext highlighter-rouge">ConfigureServices</code> method:</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">void</span> <span class="nf">ConfigureServices</span><span class="p">(</span><span class="n">IServiceCollection</span> <span class="n">services</span><span class="p">)</span>
+  <span class="p">{</span>
+    <span class="n">services</span><span class="p">.</span>
+      <span class="nf">AddUmbraco</span><span class="p">()</span>
+    <span class="p">...</span>
+    <span class="n">services</span><span class="p">.</span><span class="n">AddTransient</span><span class="p">&lt;</span><span class="n">IExtraIndexDataHandler</span><span class="p">,</span> <span class="n">ExtraIndexDataHandler</span><span class="p">&gt;();</span>
+  <span class="p">}</span>
+  
+  </code></pre></div></div>
+  
+  <h2 id="conclusion">Conclusion</h2>
+  
+  <p>Now we can add extra data to the index for any document type we want, and search for that data or include it in search results.</p>
+  </article>
+        </div>
+      </main>
+</body>
+</html>

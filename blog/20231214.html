@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Sending images from React to .NET Core</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-12-14T00:00:00+00:00" itemprop="datePublished">Dec 14, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>Normally we would send data from a React (NextJS in this case) front end to a ASP Dotnet Core API controller by JSON encoding the field data, then using the fetch API to post it. But this won’t work if we send an image. We’d need to encode/decode the image somehow.</p>
+  
+  <h2 id="1-formdata-to-the-rescue">1. FormData to the rescue</h2>
+  
+  <p>Although it isn’t simple to send an image as JSON, we can use the <code class="language-plaintext highlighter-rouge">FormData</code> object to send it as part of a multipart form. In order to do this, we need to create a <code class="language-plaintext highlighter-rouge">FormData</code> object and append the image to it. We can then send this object using the fetch API, as long as we remember to not set the <code class="language-plaintext highlighter-rouge">Content-Type</code> header to <code class="language-plaintext highlighter-rouge">application/json</code>!</p>
+  
+  <h2 id="2-the-form-react-hook-form">2. The form (react-hook-form)</h2>
+  
+  <p>We are using the <code class="language-plaintext highlighter-rouge">react-hook-form</code> library to make dealing with form inputs easier. Here’s an example NextJS page that has a form with a file input and a text input:</p>
+  
+  <div class="language-tsx highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">export</span> <span class="k">default</span> <span class="kd">function</span> <span class="nx">FilePage</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="p">{</span> <span class="nx">handleSubmit</span><span class="p">,</span> <span class="nx">register</span> <span class="p">}</span> <span class="o">=</span> <span class="nx">useForm</span><span class="o">&lt;</span><span class="p">{</span>
+      <span class="na">text</span><span class="p">:</span> <span class="kr">string</span><span class="p">;</span>
+      <span class="nl">file</span><span class="p">:</span> <span class="nx">FileList</span> <span class="o">|</span> <span class="kc">null</span><span class="p">;</span>
+    <span class="p">}</span><span class="o">&gt;</span><span class="p">({</span>
+      <span class="na">values</span><span class="p">:</span> <span class="p">{</span>
+        <span class="na">text</span><span class="p">:</span> <span class="dl">''</span><span class="p">,</span>
+        <span class="na">file</span><span class="p">:</span> <span class="kc">null</span><span class="p">,</span>
+      <span class="p">},</span>
+    <span class="p">});</span>
+  
+    <span class="k">return</span> <span class="p">(</span>
+      <span class="p">&lt;</span><span class="nt">form</span> <span class="na">onSubmit</span><span class="p">=</span><span class="si">{</span><span class="nx">handleSubmit</span><span class="p">(</span><span class="nx">onSubmit</span><span class="p">)</span><span class="si">}</span><span class="p">&gt;</span>
+        <span class="p">&lt;</span><span class="nt">div</span><span class="p">&gt;</span>
+          <span class="p">&lt;</span><span class="nt">input</span> <span class="na">type</span><span class="p">=</span><span class="s">"file"</span> <span class="si">{</span><span class="p">...</span><span class="nx">register</span><span class="p">(</span><span class="dl">'</span><span class="s1">file</span><span class="dl">'</span><span class="p">)</span><span class="si">}</span> <span class="p">/&gt;</span>
+        <span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+        <span class="p">&lt;</span><span class="nt">div</span><span class="p">&gt;</span>
+          <span class="p">&lt;</span><span class="nt">input</span> <span class="na">type</span><span class="p">=</span><span class="s">"text"</span> <span class="na">placeholder</span><span class="p">=</span><span class="s">"text here"</span> <span class="si">{</span><span class="p">...</span><span class="nx">register</span><span class="p">(</span><span class="dl">'</span><span class="s1">text</span><span class="dl">'</span><span class="p">)</span><span class="si">}</span> <span class="p">/&gt;</span>
+        <span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+        <span class="p">&lt;</span><span class="nt">div</span><span class="p">&gt;</span>
+          <span class="p">&lt;</span><span class="nt">button</span> <span class="na">type</span><span class="p">=</span><span class="s">"submit"</span><span class="p">&gt;</span>Submit<span class="p">&lt;/</span><span class="nt">button</span><span class="p">&gt;</span>
+        <span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+      <span class="p">&lt;/</span><span class="nt">form</span><span class="p">&gt;</span>
+    <span class="p">);</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <h2 id="3-onsubmit">3. onSubmit</h2>
+  
+  <p>The <code class="language-plaintext highlighter-rouge">onSubmit</code> function will be called when the form is submitted - which I omitted from the above to keep it simple. <code class="language-plaintext highlighter-rouge">onSubmit</code> will be passed the form data, which we can use to create a <code class="language-plaintext highlighter-rouge">FormData</code> object and send to the API.</p>
+  
+  <div class="language-tsx highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  <span class="kd">const</span> <span class="nx">onSubmit</span> <span class="o">=</span> <span class="k">async</span> <span class="p">(</span><span class="nx">data</span><span class="p">:</span> <span class="p">{</span> <span class="nl">text</span><span class="p">:</span> <span class="kr">string</span><span class="p">;</span> <span class="nl">file</span><span class="p">:</span> <span class="nx">FileList</span> <span class="o">|</span> <span class="kc">null</span> <span class="p">})</span> <span class="o">=&gt;</span> <span class="p">{</span>
+      <span class="kd">const</span> <span class="nx">body</span> <span class="o">=</span> <span class="nx">createFormData</span><span class="p">(</span><span class="nx">data</span><span class="p">);</span>
+  
+      <span class="kd">const</span> <span class="nx">response</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">fetch</span><span class="p">(</span><span class="dl">'</span><span class="s1">api/file</span><span class="dl">'</span><span class="p">,</span> <span class="p">{</span>
+        <span class="na">method</span><span class="p">:</span> <span class="dl">'</span><span class="s1">POST</span><span class="dl">'</span><span class="p">,</span>
+        <span class="nx">body</span><span class="p">,</span>
+      <span class="p">});</span>
+  </code></pre></div></div>
+  
+  <h2 id="4-createformdata">4. createFormData</h2>
+  
+  <p>The <code class="language-plaintext highlighter-rouge">createFormData</code> function will create a <code class="language-plaintext highlighter-rouge">FormData</code> object and append the file and text to it. We can then send this to the API. Note that we need to check that the file is not null, and that if it has a length, we only append the first one - because file inputs allow multiple files to be selected - so the API uses the <code class="language-plaintext highlighter-rouge">FileList</code> type.</p>
+  
+  <div class="language-tsx highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">const</span> <span class="nx">createFormData</span> <span class="o">=</span> <span class="p">(</span><span class="nx">data</span><span class="p">:</span> <span class="p">{</span> <span class="nl">text</span><span class="p">:</span> <span class="kr">string</span><span class="p">;</span> <span class="nl">file</span><span class="p">:</span> <span class="nx">FileList</span> <span class="o">|</span> <span class="kc">null</span> <span class="p">})</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">formData</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">FormData</span><span class="p">();</span>
+    <span class="c1">// add all non-null values to the form data - and if they have a length, add the first one</span>
+    <span class="nb">Object</span><span class="p">.</span><span class="nx">entries</span><span class="p">(</span><span class="nx">data</span><span class="p">).</span><span class="nx">forEach</span><span class="p">(([</span><span class="nx">key</span><span class="p">,</span> <span class="nx">value</span><span class="p">])</span> <span class="o">=&gt;</span> <span class="p">{</span>
+      <span class="k">if</span> <span class="p">(</span><span class="nx">value</span> <span class="o">&amp;&amp;</span> <span class="nx">value</span><span class="p">.</span><span class="nx">length</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">formData</span><span class="p">.</span><span class="nx">append</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span> <span class="nx">value</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="nx">value</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">formData</span><span class="p">.</span><span class="nx">append</span><span class="p">(</span><span class="nx">key</span><span class="p">,</span> <span class="nx">value</span> <span class="k">as</span> <span class="kr">any</span><span class="p">);</span>
+      <span class="p">}</span>
+    <span class="p">});</span>
+    <span class="k">return</span> <span class="nx">formData</span><span class="p">;</span>
+  <span class="p">};</span>
+  </code></pre></div></div>
+  
+  <h2 id="5-the-c-asp-dotnet-core-api">5. The C# ASP Dotnet Core API</h2>
+  
+  <p>Putting all the above code together we can now receive the image in our API and write it to disk. In C# the type we need to use is IFormFile. So our API will receive this model type:</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">class</span> <span class="nc">FileFormModel</span>
+  <span class="p">{</span>
+      <span class="k">public</span> <span class="kt">string</span> <span class="n">Text</span> <span class="p">{</span> <span class="k">get</span><span class="p">;</span> <span class="k">set</span><span class="p">;</span> <span class="p">}</span>
+      <span class="k">public</span> <span class="n">IFormFile</span> <span class="n">File</span> <span class="p">{</span> <span class="k">get</span><span class="p">;</span> <span class="k">set</span><span class="p">;</span> <span class="p">}</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <p>And the controller will need to use the <code class="language-plaintext highlighter-rouge">[FromForm]</code> attribute to bind to the form data:</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="n">HttpPost</span><span class="p">]</span>
+  <span class="p">[</span><span class="nf">Route</span><span class="p">(</span><span class="s">"file"</span><span class="p">)]</span>
+  <span class="k">public</span> <span class="k">async</span> <span class="n">Task</span><span class="p">&lt;</span><span class="n">IActionResult</span><span class="p">&gt;</span> <span class="nf">File</span><span class="p">([</span><span class="n">FromForm</span><span class="p">]</span> <span class="n">FileFormModel</span> <span class="n">model</span><span class="p">)</span>
+  <span class="p">{</span>
+      <span class="kt">var</span> <span class="n">filePath</span> <span class="p">=</span> <span class="n">Path</span><span class="p">.</span><span class="nf">Combine</span><span class="p">(</span><span class="n">Directory</span><span class="p">.</span><span class="nf">GetCurrentDirectory</span><span class="p">(),</span> <span class="s">"wwwroot"</span><span class="p">,</span> <span class="n">model</span><span class="p">.</span><span class="n">File</span><span class="p">.</span><span class="n">FileName</span><span class="p">);</span>
+      <span class="k">using</span> <span class="p">(</span><span class="kt">var</span> <span class="n">stream</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">FileStream</span><span class="p">(</span><span class="n">filePath</span><span class="p">,</span> <span class="n">FileMode</span><span class="p">.</span><span class="n">Create</span><span class="p">))</span>
+      <span class="p">{</span>
+          <span class="k">await</span> <span class="n">model</span><span class="p">.</span><span class="n">File</span><span class="p">.</span><span class="nf">CopyToAsync</span><span class="p">(</span><span class="n">stream</span><span class="p">);</span>
+      <span class="p">}</span>
+      <span class="k">return</span> <span class="nf">Ok</span><span class="p">();</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <h2 id="conclusion">Conclusion</h2>
+  
+  <p>By using FormData we can easily send file data from a React form to a .NET Core API.</p>
+  </div>
+  </article>
+      </main>
+</body>
+</html>

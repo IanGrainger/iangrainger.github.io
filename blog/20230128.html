@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Typescript Node Playground</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-01-28T00:00:00+00:00" itemprop="datePublished">Jan 28, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>I want to be able to use Typescript as my shell, with the default node modules available. But with modern features like async await.</p>
+  
+  <p>Starting a new Typescript project is a bit of a pain, so I wanted to create a playground to quickly try out new ideas.</p>
+  
+  <p><a href="https://github.com/alinalihassan/top-level-await">This repo</a> was the best starting point i could find.</p>
+  
+  <h2 id="to-get-started">To get started</h2>
+  
+  <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git clone https://github.com/alinalihassan/top-level-await playground
+  cd playground
+  npm install
+  npm run dev
+  </code></pre></div></div>
+  
+  <h2 id="node-modules">Node modules</h2>
+  
+  <p>But even now this still won’t let me use node modules! I added <code class="language-plaintext highlighter-rouge">const res = fetch('...')</code> and I got an error:</p>
+  
+  <blockquote>
+    <p>ReferenceError: fetch is not defined</p>
+  </blockquote>
+  
+  <p>I had to run <code class="language-plaintext highlighter-rouge">npm i node</code> to fix this.</p>
+  
+  <h2 id="prettier">Prettier</h2>
+  
+  <p>The only thing left now is to make sure your code looks nice - my standard .prettierrc is:</p>
+  
+  <div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+    </span><span class="nl">"tabWidth"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"useTabs"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"printWidth"</span><span class="p">:</span><span class="w"> </span><span class="mi">120</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"singleQuote"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"semi"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"trailingComma"</span><span class="p">:</span><span class="w"> </span><span class="s2">"all"</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+  </span></code></pre></div></div>
+  </article>
+        </div>
+      </main>
+</body>
+</html>

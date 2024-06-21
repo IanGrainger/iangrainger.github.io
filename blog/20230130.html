@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">UTF Encoding</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-01-30T00:00:00+00:00" itemprop="datePublished">Jan 30, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>Text in software is complicated. We were struggling with an HTTP response body which didn’t include a charset header - and appeared garbled when requested using Postman.</p>
+  
+  <p>The answer was that it was UTF-16 encoded, so to decode this we needed to use:</p>
+  
+  <div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">const</span> <span class="nx">decoded</span> <span class="o">=</span> <span class="nx">Buffer</span><span class="p">.</span><span class="k">from</span><span class="p">(</span><span class="nx">body</span><span class="p">,</span> <span class="dl">'</span><span class="s1">utf-16le</span><span class="dl">'</span><span class="p">).</span><span class="nx">toString</span><span class="p">(</span><span class="dl">'</span><span class="s1">utf-8</span><span class="dl">'</span><span class="p">);</span>
+  </code></pre></div></div>
+  
+  <h2 id="utf-byte-order-marks">UTF Byte Order Marks</h2>
+  
+  <p>But if you try to decode a UTF-8 buffer as UTF-16 it won’t work, so we need to check the encoding before decoding it. We can do this by checking the <a href="https://en.wikipedia.org/wiki/Byte_order_mark">Byte Order Mark (BOM)</a> (we currently only care about UTF-8 or 16!).</p>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>Encoding</th>
+        <th>BOM</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>UTF-8</td>
+        <td>EF BB BF</td>
+      </tr>
+      <tr>
+        <td>UTF-16 (BE)</td>
+        <td>FE FF</td>
+      </tr>
+      <tr>
+        <td>UTF-16 (LE)</td>
+        <td>FF FE</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <p>So we needed to get the first 2-3 hex characters from the response body, and then check if they matched any of the BOMs.</p>
+  
+  <h2 id="get-first-three-hex-characters-the-bom-from-byte-array">Get first three hex characters (the BOM) from byte array</h2>
+  
+  <div class="language-ts highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">firstThreeHexChars</span><span class="p">(</span><span class="nx">byteArray</span><span class="p">:</span> <span class="nb">Uint8Array</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">uint8Array</span> <span class="o">=</span> <span class="nx">byteArray</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">);</span>
+    <span class="kd">const</span> <span class="nx">hexString</span> <span class="o">=</span> <span class="nb">Array</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">map</span>
+      <span class="p">.</span><span class="nx">call</span><span class="p">(</span><span class="nx">uint8Array</span><span class="p">,</span> <span class="p">(</span><span class="nx">x</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="p">(</span><span class="dl">'</span><span class="s1">00</span><span class="dl">'</span> <span class="o">+</span> <span class="nx">x</span><span class="p">.</span><span class="nx">toString</span><span class="p">(</span><span class="mi">16</span><span class="p">)).</span><span class="nx">slice</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">))</span>
+      <span class="p">.</span><span class="nx">join</span><span class="p">(</span><span class="dl">''</span><span class="p">);</span>
+    <span class="k">return</span> <span class="nx">hexString</span><span class="p">;</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <h2 id="check-the-bom">Check the BOM</h2>
+  
+  <p>Now we can check the encoding using those characters:</p>
+  
+  <div class="language-ts highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">detectEncodingFromBom</span><span class="p">(</span>
+    <span class="nx">byteArray</span><span class="p">:</span> <span class="nb">Uint8Array</span>
+  <span class="p">):</span> <span class="dl">'</span><span class="s1">utf-8</span><span class="dl">'</span> <span class="o">|</span> <span class="dl">'</span><span class="s1">utf-16le</span><span class="dl">'</span> <span class="o">|</span> <span class="dl">'</span><span class="s1">utf-16be</span><span class="dl">'</span> <span class="o">|</span> <span class="kc">undefined</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nx">byteArray</span><span class="p">.</span><span class="nx">length</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">)</span> <span class="p">{</span>
+      <span class="kd">const</span> <span class="nx">hexString</span> <span class="o">=</span> <span class="nx">firstThreeHexChars</span><span class="p">(</span><span class="nx">byteArray</span><span class="p">);</span>
+      <span class="k">if</span> <span class="p">(</span><span class="nx">hexString</span> <span class="o">===</span> <span class="dl">'</span><span class="s1">efbbbf</span><span class="dl">'</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="dl">'</span><span class="s1">utf-8</span><span class="dl">'</span><span class="p">;</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="nx">hexString</span><span class="p">.</span><span class="nx">startsWith</span><span class="p">(</span><span class="dl">'</span><span class="s1">fffe</span><span class="dl">'</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="dl">'</span><span class="s1">utf-16le</span><span class="dl">'</span><span class="p">;</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="nx">hexString</span><span class="p">.</span><span class="nx">startsWith</span><span class="p">(</span><span class="dl">'</span><span class="s1">feff</span><span class="dl">'</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="dl">'</span><span class="s1">utf-16be</span><span class="dl">'</span><span class="p">;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <h2 id="decode-the-body-using-the-correct-encoding">Decode the body using the correct encoding</h2>
+  
+  <p>So to get a byte array from a url, detect its encoding, and then decode it:</p>
+  
+  <div class="language-ts highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">async</span> <span class="kd">function</span> <span class="nx">getBodyTextWithDetectedEncoding</span><span class="p">(</span><span class="nx">url</span><span class="p">:</span> <span class="kr">string</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">res</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">fetch</span><span class="p">(</span><span class="nx">url</span><span class="p">);</span>
+    <span class="kd">const</span> <span class="nx">byteArray</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">res</span><span class="p">.</span><span class="nx">arrayBuffer</span><span class="p">();</span>
+    <span class="kd">const</span> <span class="nx">encoding</span> <span class="o">=</span> <span class="nx">detectEncodingFromBom</span><span class="p">(</span><span class="k">new</span> <span class="nb">Uint8Array</span><span class="p">(</span><span class="nx">byteArray</span><span class="p">));</span>
+  
+    <span class="kd">const</span> <span class="nx">dec</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">TextDecoder</span><span class="p">(</span><span class="nx">encoding</span><span class="p">);</span>
+    <span class="kd">const</span> <span class="nx">text</span> <span class="o">=</span> <span class="nx">dec</span><span class="p">.</span><span class="nx">decode</span><span class="p">(</span><span class="nx">byteArray</span><span class="p">);</span>
+    <span class="k">return</span> <span class="nx">text</span><span class="p">;</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  </article>
+        </div>
+      </main>
+</body>
+</html>

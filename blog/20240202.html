@@ -1,0 +1,87 @@
+
+<!DOCTYPE html>
+<head>
+    <style>
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            color: #444444;
+            background-color: #FAFAFA;
+            max-width: 48rem;
+            text-align: justify;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        h4 a {
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+
+<html>
+
+<body>
+    <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Tracking page clicks with navigator.sendBeacon</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2024-02-02T00:00:00+00:00" itemprop="datePublished">Feb 2, 2024
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>When you want to track that a link has been clicked on your site, the browser will not wait for your tracking request to complete - which means you may need to prevent navigation to the link, so you can wait for the request to complete before navigation.</p>
+  
+  <h2 id="1-the-beacon-api">1. The Beacon API</h2>
+  
+  <p><a href="https://w3c.github.io/beacon/">Documented here</a>, the Beacon API allows you to send data to the server asyncronously and guarantees the request will be delivered to the server, even if the user navigates away from the page.</p>
+  
+  <p>Here’s an example of how you might use it to post a string to track a click:</p>
+  
+  <div class="language-html highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">"/some-page"</span> <span class="na">onclick=</span><span class="s">"sendBeacon('/some-page')"</span><span class="nt">&gt;</span>Click me<span class="nt">&lt;/a&gt;</span>
+  </code></pre></div></div>
+  
+  <div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">sendBeacon</span><span class="p">(</span><span class="nx">url</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nb">navigator</span><span class="p">.</span><span class="nx">sendBeacon</span><span class="p">(</span><span class="dl">'</span><span class="s1">/click</span><span class="dl">'</span><span class="p">,</span> <span class="nx">url</span><span class="p">);</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <h2 id="2-problems-with-sendbeacon">2. Problems with <code class="language-plaintext highlighter-rouge">sendBeacon</code></h2>
+  
+  <p>The problem is that the <code class="language-plaintext highlighter-rouge">sendBeacon</code> only allows some content type headers, which are determined based on what is being sent. By default it will use text (<code class="language-plaintext highlighter-rouge">text/plain</code>). And the problem with that is its quite difficult to get to body text in a <code class="language-plaintext highlighter-rouge">text/plain</code> POST request in ASP.NET Core. You need to customize the middleware to allow the body to be read twice.</p>
+  
+  <h2 id="3-using-formdata">3. Using <code class="language-plaintext highlighter-rouge">FormData</code></h2>
+  
+  <p>If you pass <code class="language-plaintext highlighter-rouge">UrlSearchParams</code> to <code class="language-plaintext highlighter-rouge">sendBeacon</code>, it will use <code class="language-plaintext highlighter-rouge">application/x-www-form-urlencoded</code>. If you pass a <code class="language-plaintext highlighter-rouge">FormData</code> object, it will use <code class="language-plaintext highlighter-rouge">multipart/form-data</code>. If you pass a <code class="language-plaintext highlighter-rouge">Blob</code> you can specify the content type, but it will be <code class="language-plaintext highlighter-rouge">application/octet-stream</code> by default.</p>
+  
+  <p>So for ASP.NET Core, I found the easiest thing was to use FormData. So with this JS:</p>
+  
+  <div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">sendBeacon</span><span class="p">(</span><span class="nx">url</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">formData</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">FormData</span><span class="p">();</span>
+    <span class="nx">formData</span><span class="p">.</span><span class="nx">append</span><span class="p">(</span><span class="dl">'</span><span class="s1">url</span><span class="dl">'</span><span class="p">,</span> <span class="nx">url</span><span class="p">);</span>
+    <span class="nb">navigator</span><span class="p">.</span><span class="nx">sendBeacon</span><span class="p">(</span><span class="dl">'</span><span class="s1">/click</span><span class="dl">'</span><span class="p">,</span> <span class="nx">formData</span><span class="p">);</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+  <p>You can bind the request body with the <code class="language-plaintext highlighter-rouge">[FromForm]</code> attribute in the C# controller method:</p>
+  
+  <div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="n">HttpPost</span><span class="p">]</span>
+  <span class="p">[</span><span class="nf">Route</span><span class="p">(</span><span class="s">"click"</span><span class="p">)]</span>
+  <span class="k">public</span> <span class="k">async</span> <span class="n">Task</span><span class="p">&lt;</span><span class="n">IActionResult</span><span class="p">&gt;</span> <span class="nf">Click</span><span class="p">([</span><span class="n">FromForm</span><span class="p">]</span> <span class="kt">string</span> <span class="n">url</span><span class="p">)</span>
+  <span class="p">{</span>
+      <span class="c1">// track the click</span>
+      <span class="k">return</span> <span class="nf">Ok</span><span class="p">();</span>
+  <span class="p">}</span>
+  </code></pre></div></div>
+  
+      </article>
+
+</body>
+
+</html>

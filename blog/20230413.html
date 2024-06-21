@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+    body {
+        font-family: 'Helvetica', 'Arial', sans-serif;
+        color: #444444;
+        background-color: #FAFAFA;
+        max-width: 48rem;
+        text-align: justify;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    h4 a {
+        font-size: 0.8rem;
+    }
+</style></head>
+<body>
+    <main class="page-content" aria-label="Content">
+        <div class="wrapper">
+          <link href="/css/override.css" rel="stylesheet" type="text/css">
+  <article class="post h-entry" itemscope="" itemtype="http://schema.org/BlogPosting">
+  
+    <header class="post-header">
+      <h1 class="post-title p-name" itemprop="name headline">Testing Async Exceptions in Jest</h1>
+      <p class="post-meta">
+        <time class="dt-published" datetime="2023-04-13T00:00:00+00:00" itemprop="datePublished">Apr 13, 2023
+        </time>
+        • <span itemprop="author" itemscope="" itemtype="http://schema.org/Person"><span class="p-author h-card" itemprop="name">Ian Grainger</span></span></p>
+    </header>
+  
+    <div class="post-content e-content" itemprop="articleBody">
+      <p>There are two ways to test that our async code throws an exception:</p>
+  
+  <ol>
+    <li>expect.rejects</li>
+    <li>try + assert / catch + expect</li>
+  </ol>
+  
+  <h2 id="expectrejects">expect.rejects</h2>
+  
+  <p>The first, and simpler way lets us check our exception type* and message - but not any other properties of the error.</p>
+  
+  <div class="language-ts highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">it</span><span class="p">(</span><span class="dl">'</span><span class="s1">should throw error matching message</span><span class="dl">'</span><span class="p">,</span> <span class="k">async</span> <span class="p">()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="k">await</span> <span class="nx">expect</span><span class="p">(</span><span class="nx">sut</span><span class="p">.</span><span class="nx">doSomething</span><span class="p">()).</span><span class="nx">rejects</span><span class="p">.</span><span class="nx">toThrow</span><span class="p">(</span><span class="k">new</span> <span class="nb">Error</span><span class="p">(</span><span class="dl">'</span><span class="s1">message</span><span class="dl">'</span><span class="p">));</span>
+  <span class="p">});</span>
+  </code></pre></div></div>
+  
+  <p>We can also move the async function inside the expect like this:</p>
+  
+  <div class="language-ts highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">it</span><span class="p">(</span><span class="dl">'</span><span class="s1">should throw error matching message</span><span class="dl">'</span><span class="p">,</span> <span class="p">()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="nx">expect</span><span class="p">(</span><span class="k">async</span> <span class="p">()</span> <span class="o">=&gt;</span> <span class="k">await</span> <span class="nx">sut</span><span class="p">.</span><span class="nx">doSomething</span><span class="p">()).</span><span class="nx">rejects</span><span class="p">.</span><span class="nx">toThrow</span><span class="p">(</span>
+      <span class="k">new</span> <span class="nb">Error</span><span class="p">(</span><span class="dl">'</span><span class="s1">message</span><span class="dl">'</span><span class="p">)</span>
+    <span class="p">);</span>
+  <span class="p">});</span>
+  </code></pre></div></div>
+  
+  <p>But as most of our tests which run this method will be <code class="language-plaintext highlighter-rouge">async</code>, the first way will be more consistent.</p>
+  
+  <p>The problem with this approach is that we can’t test any properties on the error apart from the type and message. To test other properties of the error, we need to use the second approach.</p>
+  
+  <p>* The type will always pass if we use <code class="language-plaintext highlighter-rouge">new Error('message')</code> - even if we are actually throwing a custom error type.</p>
+  
+  <h2 id="try--assert--catch--expect">try + assert / catch + expect</h2>
+  
+  <p>The second approach lets us test any properties of the error, but it is more verbose.</p>
+  
+  <div class="language-ts highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">it</span><span class="p">(</span><span class="dl">'</span><span class="s1">should throw error with code 400</span><span class="dl">'</span><span class="p">,</span> <span class="k">async</span> <span class="p">()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="k">try</span> <span class="p">{</span>
+      <span class="k">await</span> <span class="nx">sut</span><span class="p">.</span><span class="nx">doSomething</span><span class="p">();</span>
+      <span class="nx">assert</span><span class="p">.</span><span class="nx">fail</span><span class="p">(</span><span class="dl">'</span><span class="s1">should throw</span><span class="dl">'</span><span class="p">);</span>
+    <span class="p">}</span> <span class="k">catch</span> <span class="p">(</span><span class="nx">e</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">expect</span><span class="p">(</span><span class="nx">e</span><span class="p">.</span><span class="nx">code</span><span class="p">).</span><span class="nx">toEqual</span><span class="p">(</span><span class="mi">400</span><span class="p">);</span>
+    <span class="p">}</span>
+  <span class="p">});</span>
+  </code></pre></div></div>
+  
+  <p>We need to use <code class="language-plaintext highlighter-rouge">assert.fail()</code> to make the test fail if the expected exception isn’t thrown. In the catch block we can then test any properties of the exception are as expected. However, we can not use .toEqual({code: 400}) because the error is not an object.</p>
+  </article>
+        </div>
+      </main>
+</body>
+</html>
