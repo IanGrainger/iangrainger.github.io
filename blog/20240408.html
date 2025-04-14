@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<head>
+  <title>MethodInfo vs Linq Expressions for Hot Chocolate GraphQL Server</title>
+  <style>
+    body {
+      font-family: 'Helvetica', 'Arial', sans-serif;
+      color: #444444;
+      background-color: #fafafa;
+      max-width: 48rem;
+      text-align: justify;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    h4 a {
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+
+<html>
+  <body>
+    <article
+      class="post h-entry"
+      itemscope=""
+      itemtype="http://schema.org/BlogPosting"
+    >
+      <header class="post-header">
+        <h1 class="post-title p-name" itemprop="name headline">
+          MethodInfo vs Linq Expressions for Hot Chocolate GraphQL Server
+        </h1>
+        <p class="post-meta">
+          <time
+            class="dt-published"
+            datetime="2025-04-08T00:00:00+00:00"
+            itemprop="datePublished"
+            >Apr 8, 2025
+          </time>
+          •
+          <span
+            itemprop="author"
+            itemscope=""
+            itemtype="http://schema.org/Person"
+            ><span class="p-author h-card" itemprop="name"
+              >Ian Grainger</span
+            ></span
+          >
+        </p>
+      </header>
+
+      <div class="post-content e-content" itemprop="articleBody">
+        <p>
+          We needed to modify how the C# GraphQL server we were using (Hot
+          Chocolate) performs searches in a couple of ways.
+        </p>
+        <p>
+          The first was quite straightforward - we needed to make our text
+          searches (using the contains operator) case insensitive. That is
+          actually given as
+          <a
+            href="https://chillicream.com/docs/hotchocolate/v12/api-reference/extending-filtering#:~:text=%7D-,Extending%20IQueryable,-The%20default%20filtering"
+            >an example in the docs</a
+          >. This example shows how to use the
+          <code class="language-plaintext highlighter-rouge">Configure</code>
+          method of a class derived from
+          <code class="language-plaintext highlighter-rouge"
+            >FilterConvention</code
+          >, and calling
+          <code class="language-plaintext highlighter-rouge"
+            >AddFieldHandler</code
+          >
+          with a class derived from
+          <code class="language-plaintext highlighter-rouge"
+            >QueryableStringInvariantContainsHandler</code
+          >.
+        </p>
+        <p>
+          But we also wanted to allow partial case insensitive search on a Guid
+          field - with or without hyphens. This would mean adding the 'contains'
+          operation to GraphQL's UUID type and using a more complicated
+          expression to perform the search.
+        </p>
+        <p>
+          Note: Most of the credit here is owed to Harrison Pitcher at GMSL who
+          worked most of this out - particularly how to use
+          <code class="language-plaintext highlighter-rouge"
+            >AddProviderExtension</code
+          >
+          and
+          <code class="language-plaintext highlighter-rouge"
+            >ReflectionUtils</code
+          >
+        </p>
+        <h2>
+          1. Adding the
+          <code class="language-plaintext highlighter-rouge">contains</code>
+          operation for a Guid field
+        </h2>
+        <p>
+          The example linked above shows how to provide a string operation
+          filter. To add a new operation to a field of any type, you need to go
+          up a level and implement the
+          <code class="language-plaintext highlighter-rouge"
+            >QueryableOperationHandlerBase</code
+          >
+          class. You can then override
+          <code class="language-plaintext highlighter-rouge">CanHandle</code> to
+          show what operations can be handled, and
+          <code class="language-plaintext highlighter-rouge"
+            >HandleOperation</code
+          >
+          to do the work of creating the expression to be run when the handled
+          operation is performed via GraphQL.
+        </p>
+        <p>
+          Once we had got access to all the MethodInfos we needed, and chained
+          them with Expression.Call to give the resulting expression tree - we
+          could connect that to the GraphQL server like this:
+        </p>
+        <div
+          style="
+            overflow: auto;
+            position: relative;
+            margin-bottom: 1em;
+            background: #151515;
+            color: #d0d0d0;
+            font-family: Monaco, Consolas, monospace;
+            font-size: 1em;
+            line-height: 1.8;
+            border-radius: 4px;
+          "
+        >
+          <pre
+            style="background: #151515; border: none"
+          ><span style="color:#505050">// In service start up</span>
+<span style="color:#d0d0d0;background-color:#151515">builder</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Services</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">AddGraphQLServer</span><span style="color:#d0d0d0">().</span><span style="color:#d0d0d0;background-color:#151515">AddConvention</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d0d0d0;background-color:#151515">IFilterConvention</span><span style="color:#d0d0d0">&gt;(</span>
+  <span style="color:#aa759f">new</span> <span style="color:#d0d0d0;background-color:#151515">FilterConventionExtension</span><span style="color:#d0d0d0">(</span>
+    <span style="color:#d0d0d0;background-color:#151515">filterConventionDescriptor</span> <span style="color:#d0d0d0">=&gt;</span>
+    <span style="color:#d0d0d0">{</span>
+      <span style="color:#d0d0d0;background-color:#151515">filterConventionDescriptor</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Configure</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d0d0d0;background-color:#151515">UuidOperationFilterInputType</span><span style="color:#d0d0d0">&gt;(</span>
+        <span style="color:#d0d0d0;background-color:#151515">filterInputTypeDescriptor</span> <span style="color:#d0d0d0">=&gt;</span>
+          <span style="color:#d0d0d0;background-color:#151515">filterInputTypeDescriptor</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Operation</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">DefaultFilterOperations</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Contains</span><span style="color:#d0d0d0">).</span><span style="color:#d0d0d0;background-color:#151515">Type</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d0d0d0;background-color:#151515">StringType</span><span style="color:#d0d0d0">&gt;());</span>
+
+      <span style="color:#d0d0d0;background-color:#151515">filterConventionDescriptor</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">AddProviderExtension</span><span style="color:#d0d0d0">(</span>
+        <span style="color:#aa759f">new</span> <span style="color:#d0d0d0;background-color:#151515">QueryableFilterProviderExtension</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">filterProviderDescriptor</span> <span style="color:#d0d0d0">=&gt;</span>
+          <span style="color:#d0d0d0;background-color:#151515">filterProviderDescriptor</span> <span style="color:#d0d0d0">=&gt;</span>
+            <span style="color:#d0d0d0;background-color:#151515">filterProviderDescriptor</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">AddFieldHandler</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d0d0d0;background-color:#151515">QueryableUuidContainsHandler</span><span style="color:#d0d0d0">&gt;()));</span>
+    <span style="color:#d0d0d0">}</span>
+  <span style="color:#d0d0d0">));</span>
+<span style="color:#505050">// End service start up</span>
+          
+<span style="color:#aa759f">public</span> <span style="color:#aa759f">class</span> <span style="color:#f4bf75">QueryableUuidContainsHandler</span> <span style="color:#d0d0d0">:</span> <span style="color:#d0d0d0;background-color:#151515">QueryableOperationHandlerBase</span>
+<span style="color:#d0d0d0">{</span>
+  <span style="color:#aa759f">private</span> <span style="color:#aa759f">static</span> <span style="color:#aa759f">readonly</span> <span style="color:#d0d0d0;background-color:#151515">MethodInfo</span> <span style="color:#d0d0d0;background-color:#151515">GuidToStringMethodInfo</span> <span style="color:#d0d0d0">=</span> 
+    <span style="color:#d0d0d0;background-color:#151515">ReflectionUtils</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ExtractMethod</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d0d0d0;background-color:#151515">Guid</span><span style="color:#d0d0d0">&gt;(</span><span style="color:#d0d0d0;background-color:#151515">x</span> <span style="color:#d0d0d0">=&gt;</span> <span style="color:#d0d0d0;background-color:#151515">x</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ToString</span><span style="color:#d0d0d0">());</span>
+
+  <span style="color:#aa759f">private</span> <span style="color:#aa759f">static</span> <span style="color:#aa759f">readonly</span> <span style="color:#d0d0d0;background-color:#151515">MethodInfo</span> <span style="color:#d0d0d0;background-color:#151515">ReplaceMethodInfo</span> <span style="color:#d0d0d0">=</span>
+    <span style="color:#d0d0d0;background-color:#151515">ReflectionUtils</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ExtractMethod</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d28445">string</span><span style="color:#d0d0d0">&gt;(</span><span style="color:#d0d0d0;background-color:#151515">x</span> <span style="color:#d0d0d0">=&gt;</span> <span style="color:#d0d0d0;background-color:#151515">x</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Replace</span><span style="color:#d0d0d0">(</span><span style="color:#aa759f">default</span><span style="color:#d0d0d0">(</span><span style="color:#d28445">string</span><span style="color:#d0d0d0">)!,</span> <span style="color:#aa759f">default</span><span style="color:#d0d0d0">!));</span>
+      
+  <span style="color:#aa759f">private</span> <span style="color:#aa759f">static</span> <span style="color:#aa759f">readonly</span> <span style="color:#d0d0d0;background-color:#151515">MethodInfo</span> <span style="color:#d0d0d0;background-color:#151515">ToLowerMethodInfo</span> <span style="color:#d0d0d0">=</span>
+    <span style="color:#d0d0d0;background-color:#151515">ReflectionUtils</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ExtractMethod</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d28445">string</span><span style="color:#d0d0d0">&gt;(</span><span style="color:#d0d0d0;background-color:#151515">x</span> <span style="color:#d0d0d0">=&gt;</span> <span style="color:#d0d0d0;background-color:#151515">x</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ToLowerInvariant</span><span style="color:#d0d0d0">());</span>
+
+    <span style="color:#aa759f">public</span> <span style="color:#aa759f">override</span> <span style="color:#d28445">bool</span> <span style="color:#d0d0d0;background-color:#151515">CanHandle</span><span style="color:#d0d0d0">(</span>
+      <span style="color:#d0d0d0;background-color:#151515">ITypeCompletionContext</span> <span style="color:#d0d0d0;background-color:#151515">context</span><span style="color:#d0d0d0">,</span>
+      <span style="color:#d0d0d0;background-color:#151515">IFilterInputTypeDefinition</span> <span style="color:#d0d0d0;background-color:#151515">typeDefinition</span><span style="color:#d0d0d0">,</span>
+      <span style="color:#d0d0d0;background-color:#151515">IFilterFieldDefinition</span> <span style="color:#d0d0d0;background-color:#151515">fieldDefinition</span><span style="color:#d0d0d0">)</span>
+    <span style="color:#d0d0d0">{</span>
+      <span style="color:#aa759f">return</span> <span style="color:#d0d0d0;background-color:#151515">context</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Type</span> <span style="color:#aa759f">is</span> <span style="color:#d0d0d0;background-color:#151515">UuidOperationFilterInputType</span><span style="color:#d0d0d0">;</span>
+    <span style="color:#d0d0d0">}</span>
+
+  <span style="color:#aa759f">public</span> <span style="color:#aa759f">override</span> <span style="color:#d0d0d0;background-color:#151515">HandleOperation</span><span style="color:#d0d0d0">(</span>
+    <span style="color:#d0d0d0;background-color:#151515">QueryableFilterContext</span> <span style="color:#d0d0d0;background-color:#151515">context</span><span style="color:#d0d0d0">,</span>
+    <span style="color:#d0d0d0;background-color:#151515">IFilterOperationField</span> <span style="color:#d0d0d0;background-color:#151515">field</span><span style="color:#d0d0d0">,</span>
+    <span style="color:#d0d0d0;background-color:#151515">IValueNode</span> <span style="color:#aa759f">value</span><span style="color:#d0d0d0">,</span>
+    <span style="color:#d28445">object</span><span style="color:#d0d0d0">?</span> <span style="color:#d0d0d0;background-color:#151515">parsedValue</span><span style="color:#d0d0d0">)</span> <span style="color:#d0d0d0">{</span>
+    
+    <span style="color:#d28445">var</span> <span style="color:#d0d0d0;background-color:#151515">property</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">context</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">GetInstance</span><span style="color:#d0d0d0">();</span>
+    
+    <span style="color:#d0d0d0;background-color:#151515">parsedString</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">parsedValue</span> <span style="color:#aa759f">switch</span> <span style="color:#d0d0d0">{</span>
+      <span style="color:#d0d0d0;background-color:#151515">Guid</span> <span style="color:#d0d0d0;background-color:#151515">guidValue</span> <span style="color:#d0d0d0">=&gt;</span> <span style="color:#d0d0d0;background-color:#151515">guidValue</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ToString</span><span style="color:#d0d0d0">(),</span>
+      <span style="color:#d28445">string</span> <span style="color:#d0d0d0;background-color:#151515">stringValue</span> <span style="color:#d0d0d0">=&gt;</span> <span style="color:#d0d0d0;background-color:#151515">stringValue</span><span style="color:#d0d0d0">,</span>
+      <span style="color:#505050">// ... (null and default handling)
+</span>
+    <span style="color:#d0d0d0">}</span>
+
+    <span style="color:#d28445">var</span> <span style="color:#d0d0d0;background-color:#151515">doToString</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Call</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">property</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">GuidToStringMethodInfo</span><span style="color:#d0d0d0">);</span>
+    <span style="color:#d28445">var</span> <span style="color:#d0d0d0;background-color:#151515">doToLower</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Call</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">doToString</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">ToLowerMethodInfo</span><span style="color:#d0d0d0">);</span>
+    <span style="color:#d28445">var</span> <span style="color:#d0d0d0;background-color:#151515">doRemoveDashes</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Call</span><span style="color:#d0d0d0">(</span>
+        <span style="color:#d0d0d0;background-color:#151515">doToLower</span><span style="color:#d0d0d0">,</span>
+        <span style="color:#d0d0d0;background-color:#151515">ReplaceMethodInfo</span><span style="color:#d0d0d0">,</span>
+        <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Constant</span><span style="color:#d0d0d0">(</span><span style="color:#90a959">"-"</span><span style="color:#d0d0d0">),</span>
+        <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Constant</span><span style="color:#d0d0d0">(</span><span style="color:#d28445">string</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Empty</span><span style="color:#d0d0d0">));</span>
+    
+    <span style="color:#d28445">var</span> <span style="color:#d0d0d0;background-color:#151515">lowercaseParsedString</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">parsedString</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ToLowerInvariant</span><span style="color:#d0d0d0">();</span>
+
+    <span style="color:#d28445">var</span> <span style="color:#d0d0d0;background-color:#151515">dashedContains</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">FilterExpressionBuilder</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Contains</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">doToLower</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">lowercaseParsedString</span><span style="color:#d0d0d0">);</span>
+    <span style="color:#d28445">var</span> <span style="color:#d0d0d0;background-color:#151515">undashedContains</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">FilterExpressionBuilder</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Contains</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">doRemoveDashes</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">lowercaseParsedString</span><span style="color:#d0d0d0">);</span>
+
+    <span style="color:#aa759f">return</span> <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Or</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">dashedContains</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">undashedContains</span><span style="color:#d0d0d0">);</span>
+  <span style="color:#d0d0d0">}</span>
+<span style="color:#d0d0d0">}</span></pre>
+        </div>
+
+        <!-- <p>
+          <pre>
+            UNHIGHLIGHTED! 
+// In service start up
+builder.Services.AddGraphQLServer().AddConvention<IFilterConvention>(
+new FilterConventionExtension(
+  filterConventionDescriptor =>
+  {
+    filterConventionDescriptor.Configure<UuidOperationFilterInputType>(
+      filterInputTypeDescriptor =>
+        filterInputTypeDescriptor.Operation(DefaultFilterOperations.Contains).Type<StringType>());
+
+    filterConventionDescriptor.AddProviderExtension(
+      new QueryableFilterProviderExtension(filterProviderDescriptor =>
+        filterProviderDescriptor =>
+          filterProviderDescriptor.AddFieldHandler<QueryableUuidContainsHandler>()));
+  }
+)
+);
+// End service start up
+          
+public class QueryableUuidContainsHandler : QueryableOperationHandlerBase
+{
+  private static readonly MethodInfo GuidToStringMethodInfo = 
+    ReflectionUtils.ExtractMethod<Guid>(x => x.ToString());
+
+  private static readonly MethodInfo ReplaceMethodInfo =
+    ReflectionUtils.ExtractMethod<string>(x => x.Replace(default(string)!, default!));
+      
+  private static readonly MethodInfo ToLowerMethodInfo =
+    ReflectionUtils.ExtractMethod<string>(x => x.ToLowerInvariant());
+
+  public override bool CanHandle(
+    ITypeCompletionContext context,
+    IFilterInputTypeDefinition typeDefinition,
+    IFilterFieldDefinition fieldDefinition)
+  {
+    return context.Type is UuidOperationFilterInputType;
+  }
+
+  public override HandleOperation(
+    QueryableFilterContext context,
+    IFilterOperationField field,
+    IValueNode value,
+    object? parsedValue) {
+    
+    var property = context.GetInstance();
+    
+    parsedString = parsedValue switch {
+      Guid guidValue => guidValue.ToString(),
+      string stringValue => stringValue,
+      // ... (null and default handling)
+    }
+
+    var doToString = Expression.Call(property, GuidToStringMethodInfo);
+    var doToLower = Expression.Call(doToString, ToLowerMethodInfo);
+    var doRemoveDashes = Expression.Call(
+        doToLower,
+        ReplaceMethodInfo,
+        Expression.Constant("-"),
+        Expression.Constant(string.Empty));
+    
+    var lowercaseParsedString = parsedString.ToLowerInvariant();
+
+    var dashedContains = FilterExpressionBuilder.Contains(doToLower, lowercaseParsedString);
+    var undashedContains = FilterExpressionBuilder.Contains(doRemoveDashes, lowercaseParsedString);
+
+    return Expression.Or(dashedContains, undashedContains);
+  }
+}
+        </pre>
+      </p> -->
+        <h2>
+          2. Moving from Expression.Call on MethodInfos to Expression.Invoke on
+          Expression&lt;Func&lt;T, Y&gt;&gt;
+        </h2>
+        <p>
+          Now our new contains filter was working - but the code didn't look
+          good. There was a lot of lines finding MethodInfos in order to
+          construct the expression to execute when GraphQL was performing the
+          filter. And unfortunately the way you go about finding them (matching
+          number of parameters etc) is complicated and hard to read.
+        </p>
+        <p>
+          A senior developer suggested that it should be possible to use a LINQ
+          expression instead. That means creating a LINQ delegate, but casting
+          it to
+          <code class="language-plaintext highlighter-rouge">Expression</code>,
+          so it will be an object of type
+          <code class="language-plaintext highlighter-rouge"
+            >Expression&lt;Func&lt;T, Y&gt;&gt;</code
+          >.
+        </p>
+        <p>
+          What confused us for a while was that while you can use
+          <code class="language-plaintext highlighter-rouge"
+            >Expression.Call</code
+          >
+          to execute a method - a LINQ expression requires you to use
+          <code class="language-plaintext highlighter-rouge"
+            >Expression.Invoke</code
+          >, passing in the expression itself and any runtime arguments.
+        </p>
+        <p>
+          This meant that we could write our more complex expression in a single
+          line of LINQ, which makes it much easier to read!
+        </p>
+        <div
+          style="
+            overflow: auto;
+            position: relative;
+            margin-bottom: 1em;
+            background: #151515;
+            color: #d0d0d0;
+            font-family: Monaco, Consolas, monospace;
+            font-size: 1em;
+            line-height: 1.8;
+            border-radius: 4px;
+          "
+        >
+          <pre
+            style="background: #151515; border: none"
+          ><span style="color:#aa759f">public</span> <span style="color:#aa759f">class</span> <span style="color:#f4bf75">QueryableUuidContainsHandler</span> <span style="color:#d0d0d0">:</span> <span style="color:#d0d0d0;background-color:#151515">QueryableOperationHandlerBase</span>
+<span style="color:#d0d0d0">{</span>
+  <span style="color:#aa759f">private</span> <span style="color:#aa759f">static</span> <span style="color:#aa759f">readonly</span> <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d0d0d0;background-color:#151515">Func</span><span style="color:#d0d0d0">&lt;</span><span style="color:#d0d0d0;background-color:#151515">Guid</span><span style="color:#d0d0d0">,</span> <span style="color:#d28445">string</span><span style="color:#d0d0d0">,</span> <span style="color:#d28445">bool</span><span style="color:#d0d0d0">&gt;&gt;</span> <span style="color:#d0d0d0;background-color:#151515">UuidContainsExpression</span> <span style="color:#d0d0d0">=</span> 
+    <span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">fieldValue</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">queryValue</span><span style="color:#d0d0d0">)</span> <span style="color:#d0d0d0">=&gt;</span>
+        <span style="color:#d0d0d0;background-color:#151515">fieldValue</span>
+        <span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ToString</span><span style="color:#d0d0d0">()</span>
+        <span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Replace</span><span style="color:#d0d0d0">(</span><span style="color:#90a959">"-"</span><span style="color:#d0d0d0">,</span> <span style="color:#d28445">string</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Empty</span><span style="color:#d0d0d0">)</span>
+        <span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Contains</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">queryValue</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">StringComparison</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">InvariantCultureIgnoreCase</span><span style="color:#d0d0d0">)</span>
+      <span style="color:#d0d0d0">||</span> <span style="color:#d0d0d0;background-color:#151515">fieldValue</span>
+        <span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ToString</span><span style="color:#d0d0d0">()</span>
+        <span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Contains</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">queryValue</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">StringComparison</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">InvariantCultureIgnoreCase</span><span style="color:#d0d0d0">);</span>
+        
+  <span style="color:#aa759f">public</span> <span style="color:#aa759f">override</span> <span style="color:#d0d0d0;background-color:#151515">HandleOperation</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">QueryableFilterContext</span> <span style="color:#d0d0d0;background-color:#151515">context</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">IFilterOperationField</span> <span style="color:#d0d0d0;background-color:#151515">field</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">IValueNode</span> <span style="color:#aa759f">value</span><span style="color:#d0d0d0">,</span> <span style="color:#d28445">object</span><span style="color:#d0d0d0">?</span> <span style="color:#d0d0d0;background-color:#151515">parsedValue</span><span style="color:#d0d0d0">)</span> <span style="color:#d0d0d0">{</span>
+    <span style="color:#d28445">var</span> <span style="color:#d0d0d0;background-color:#151515">property</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">context</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">GetInstance</span><span style="color:#d0d0d0">();</span>
+    
+    <span style="color:#d0d0d0;background-color:#151515">parsedString</span> <span style="color:#d0d0d0">=</span> <span style="color:#d0d0d0;background-color:#151515">parsedValue</span> <span style="color:#aa759f">switch</span> <span style="color:#d0d0d0">{</span>
+      <span style="color:#d0d0d0;background-color:#151515">Guid</span> <span style="color:#d0d0d0;background-color:#151515">guidValue</span> <span style="color:#d0d0d0">=&gt;</span> <span style="color:#d0d0d0;background-color:#151515">guidValue</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">ToString</span><span style="color:#d0d0d0">(),</span>
+      <span style="color:#d28445">string</span> <span style="color:#d0d0d0;background-color:#151515">stringValue</span> <span style="color:#d0d0d0">=&gt;</span> <span style="color:#d0d0d0;background-color:#151515">stringValue</span><span style="color:#d0d0d0">,</span>
+      <span style="color:#505050">// ... (null and default handling)
+</span>
+    <span style="color:#d0d0d0">}</span>
+
+    <span style="color:#aa759f">return</span> <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Invoke</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">UuidContainsExpression</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">property</span><span style="color:#d0d0d0">,</span> <span style="color:#d0d0d0;background-color:#151515">Expression</span><span style="color:#d0d0d0">.</span><span style="color:#d0d0d0;background-color:#151515">Constant</span><span style="color:#d0d0d0">(</span><span style="color:#d0d0d0;background-color:#151515">parsedString</span><span style="color:#d0d0d0">))</span>
+  <span style="color:#d0d0d0">}</span>
+<span style="color:#d0d0d0">}</span></pre>
+        </div>
+
+        <!-- UNHIGHLIGHTED<pre>
+public class QueryableUuidContainsHandler : QueryableOperationHandlerBase
+{
+  private static readonly Expression<Func<Guid, string, bool>> UuidContainsExpression = 
+    (fieldValue, queryValue) =>
+        fieldValue
+        .ToString()
+        .Replace("-", string.Empty)
+        .Contains(queryValue, StringComparison.InvariantCultureIgnoreCase)
+      || fieldValue
+        .ToString()
+        .Contains(queryValue, StringComparison.InvariantCultureIgnoreCase);
+        
+  public override HandleOperation(QueryableFilterContext context, IFilterOperationField field, IValueNode value, object? parsedValue) {
+    var property = context.GetInstance();
+    
+    parsedString = parsedValue switch {
+      Guid guidValue => guidValue.ToString(),
+      string stringValue => stringValue,
+      // ... (null and default handling)
+    }
+
+    return Expression.Invoke(UuidContainsExpression, property, Expression.Constant(parsedString))
+  }
+}
+        </pre> -->
+      </div>
+    </article>
+  </body>
+</html>
