@@ -283,10 +283,10 @@ public class QueryableUuidContainsHandler : QueryableOperationHandlerBase
         </h2>
         <p>
           Now our new contains filter was working - but the code didn't look
-          good. There was a lot of lines finding MethodInfos in order to
-          construct the expression to execute when GraphQL was performing the
-          filter. And unfortunately the way you go about finding them (matching
-          number of parameters etc) is complicated and hard to read.
+          good. There were a lot of lines to find the
+          <code class="language-plaintext highlighter-rouge">MethodInfos</code>
+          to construct the expression to execute when GraphQL was performing the
+          filter. This made the code hard to understand or modify.
         </p>
         <p>
           A senior developer suggested that it should be possible to use a LINQ
